@@ -57,9 +57,9 @@ class KavMain :
     def getinfo(self) :
         info = {} # 사전형 변수 선언
         info['author'] = 'Kei Choi' # 제작자
-        info['version'] = '1.0'     # 버전
+        info['version'] = __version__ # 버전
         info['title'] = 'HWP OLE Embeded Engine' # 엔진 설명
-        info['kmd_name'] = 'ole10native' # 엔진 파일명
+        info['kmd_name'] = 'embeded' # 엔진 파일명
         return info
 
     #-----------------------------------------------------------------
