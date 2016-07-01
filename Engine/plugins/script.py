@@ -4,7 +4,13 @@
 import os # 파일 삭제를 위해 import
 import hashlib # MD5 해시를 위해 import
 import mmap
+import re
 import kernel
+
+__revision__ = '$LastChangedRevision: 1 $'
+__author__   = 'Kei Choi'
+__version__  = '1.0.0.%d' % int( __revision__[21:-2] )
+__contact__  = 'hanul93@gmail.com'
 
 #---------------------------------------------------------------------
 # KavMain 클래스
@@ -13,57 +19,32 @@ import kernel
 #---------------------------------------------------------------------
 class KavMain :
     #-----------------------------------------------------------------
-    # scan(self, filehandle, filename)
-    # 악성코드를 검사한다.
-    # 인자값 : mmhandle         - 파일 mmap 핸들
-    #        : scan_file_struct - 파일 구조체
-    #        : format           - 미리 분석된 파일 포맷
-    # 리턴값 : (악성코드 발견 여부, 악성코드 이름, 악성코드 ID) 등등
+    # init(self, plugins)
+    # 백신 엔진 모듈의 초기화 작업을 수행한다.
     #-----------------------------------------------------------------
-    def scan(self, mmhandle, filename, deepname, format) :
-        try : # 백신 엔진의 오류를 방지하기 위해 예외 처리를 선언 
-            mm = mmhandle # 파일 mmap 핸들을 mm에 저장
-
-            buf = mm[0:2] # 파일 처음부터 68 Byte를 읽음
-
-            if buf == 'va' : # buf에 68 Byte가 읽혔나?
-                v_pattern = mm[0x14:0x14+11]
-
-                if v_pattern == 'fnc = \'ev\';' :
-                    # 맞다면 검사 결과와 이름, ID를 리턴
-                    return (True, 'VIRUS-TEST', 0, kernel.INFECTED)
-        except : # 모든 예외사항을 처리
-            pass
+    def init(self, plugins) : # 백신 모듈 초기화
+        # script, iframe 정규식
+        s_pat = r'<script.*?>([\d\D]*?)</script>'
+        i_pat = r'<iframe.*?>([\d\D]*?)</iframe>'
+    
+        self.s_mat1 = re.compile(s_pat, re.I)
+        self.i_mat1 = re.compile(i_pat, re.I)
         
-        return (False, '', -1, kernel.NOT_FOUND)
+        s_pat = r'\s*<script'
+        i_pat = r'\s*<iframe'
+        
+        self.s_mat2 = re.compile(s_pat, re.I)
+        self.i_mat2 = re.compile(i_pat, re.I)
+
+        return 0
 
     #-----------------------------------------------------------------
-    # disinfect(self, filename, malwareID)
-    # 악성코드를 치료한다.
-    # 인자값 : filename   - 파일 이름
-    #        : malwareID  - 치료할 악성코드 ID
-    # 리턴값 : 악성코드 치료 여부
+    # uninit(self)
+    # 백신 엔진 모듈의 종료화 작업을 수행한다.
     #-----------------------------------------------------------------
-    def disinfect(self, filename, malwareID) : # 악성코드 치료
-        try :
-            # 악성코드 진단 결과에서 받은 ID 값이 0인가?
-            if malwareID == 0 : 
-                os.remove(filename) # 파일 삭제
-                return True # 치료 완료 리턴
-        except :
-            pass
-
-        return False # 치료 실패 리턴
-
-    #-----------------------------------------------------------------
-    # listvirus(self)
-    # 진단/치료 가능한 악성코드의 목록을 알려준다.
-    #-----------------------------------------------------------------
-    def listvirus(self) :
-        vlist = [] # 리스트형 변수 선언
-        # vlist.append('VIRUS-TEST') # 진단하는 악성코드 이름 등록
-        return vlist
-
+    def uninit(self) : # 백신 모듈 종료화
+        return 0
+            
     #-----------------------------------------------------------------
     # getinfo(self)
     # 백신 엔진 모듈의 주요 정보를 알려준다. (버전, 제작자...)
@@ -71,12 +52,96 @@ class KavMain :
     def getinfo(self) :
         info = {} # 사전형 변수 선언
         info['author'] = 'Kei Choi' # 제작자
-        info['version'] = '1.0'     # 버전
-        info['title'] = 'VIRUS-TEST Engine' # 엔진 설명
+        info['version'] = __version__     # 버전
+        info['title'] = 'Script/IFrame Engine' # 엔진 설명
         info['kmd_name'] = 'script' # 엔진 파일명
 
         # 패턴 생성날짜와 시간은 없다면 빌드 시간으로 자동 설정
         info['date']    = 0   # 패턴 생성 날짜 
         info['time']    = 0   # 패턴 생성 시간 
-        info['sig_num'] = 1 # 패턴 수
-        return info
+        info['sig_num'] = 0 # 패턴 수
+        return info  
+        
+    #-----------------------------------------------------------------
+    # format(self, mmhandle, filename)
+    # 포맷 분석기이다.
+    #-----------------------------------------------------------------
+    def format(self, mmhandle, filename) :
+        try :
+            fformat = {} # 포맷 정보를 담을 공간
+
+            mm = mmhandle
+
+            s = self.s_mat2.match(mm[:4096]) # <script로 시작하나?
+            if s :
+                t = self.s_mat1.findall(mm) 
+                size = len(t[0])
+                if size != 0 :
+                    fformat['size'] = size # 포맷 주요 정보 저장
+                
+                    ret = {}
+                    ret['ff_script'] = fformat
+
+                    return ret
+                
+            s = self.i_mat2.match(mm[:4096]) # <iframe로 시작하나?
+            if s :
+                t = self.i_mat1.findall(mm) 
+                size = len(t[0])
+                if size != 0 :
+                    fformat['group'] = t # 포맷 주요 정보 저장
+                
+                    ret = {}
+                    ret['ff_iframe'] = fformat
+
+                    return ret
+        except :
+            pass
+
+        return None
+    
+    #-----------------------------------------------------------------
+    # arclist(self, scan_file_struct, format)
+    # 포맷 분석기이다.
+    #-----------------------------------------------------------------
+    def arclist(self, filename, format) :
+        file_scan_list = [] # 검사 대상 정보를 모두 가짐
+
+        try :
+            # 미리 분석된 파일 포맷중에 ff_script 포맷이 있는가?
+            if format.has_key('ff_script') :                    
+                file_scan_list.append(['arc_script', 'JavaScript']) 
+            elif format.has_key('ff_iframe') :  
+                file_scan_list.append(['arc_iframe', 'IFrame']) # HTML에서 넘어오는거라 IFrame 이름 없어도 됨
+        except :
+            pass
+
+        return file_scan_list
+
+    #-----------------------------------------------------------------
+    # unarc(self, scan_file_struct)
+    # 주어진 압축된 파일명으로 파일을 해제한다.
+    #-----------------------------------------------------------------
+    def unarc(self, arc_engine_id, arc_name, arc_in_name) :
+        try :
+            if arc_engine_id == 'arc_script' or arc_engine_id == 'arc_iframe' :
+                fp = open(arc_name, 'rb')
+                buf = fp.read()
+                fp.close()      
+                
+                t = self.s_mat1.findall(buf) 
+                if t : 
+                    #print '---'
+                    #print t[0]
+                    return t[0]
+                    
+                t = self.i_mat1.findall(buf) 
+                if t : 
+                    #print '---'
+                    #print t[0]
+                    return t[0]
+        except :
+            pass
+
+        return None
+
