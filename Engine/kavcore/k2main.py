@@ -447,7 +447,7 @@ class EngineInstance :
 
     def __del_temp_file__(self, dellist) :
         for file in dellist :
-            #os.remove(file)
+            os.remove(file)
             pass
 
 
