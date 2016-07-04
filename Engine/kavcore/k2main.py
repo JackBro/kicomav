@@ -349,7 +349,7 @@ class EngineInstance :
                         if ret_value['result'] == True :
                             if cb != None :
                                 cb(ret_value)
-
+                    
                     # 이미 해당 파일이 악성코드라고 판명되었다면
                     # 그 파일을 압축해제해서 내부를 볼 필요는 없다.
                     if ret_value['result'] == False : # 따라서 악성코드가 아닌경우만 검사
@@ -408,7 +408,7 @@ class EngineInstance :
                         file_scan_list.append(fs)
 
                     self.result['Packed'] += 1
-                    break
+                    # break # 압축 해제 이후 또 압축이 존재 할 수 있어서 삭제
 
         return file_scan_list
 
@@ -447,7 +447,8 @@ class EngineInstance :
 
     def __del_temp_file__(self, dellist) :
         for file in dellist :
-            os.remove(file)
+            #os.remove(file)
+            pass
 
 
     def __scan_file__(self, scan_file_struct, format) :

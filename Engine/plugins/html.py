@@ -84,13 +84,15 @@ class KavMain :
 
             s = self.html_p.findall(mm[:4096])
             s = list(set(s))
-
+            
+            # print '[*] THTML KEYWORD :', len(s)
+            
             if len(s) >= HTML_KEY_COUNT : 
                 fformat['keyword'] = s # 포맷 주요 정보 저장
 
                 ret = {}
                 ret['ff_html'] = fformat
-
+                                
                 return ret
         except :
             pass
@@ -114,12 +116,13 @@ class KavMain :
             
             s = self.html_p.findall(buf)
             s = list(set(s))
+                        
             if len(s) >= HTML_KEY_COUNT : # HTML 키워드가 3개 이상 발견되면 HTML 포맷
                 # script와 iframe 리스트를 만든다.
                 
                 s_count = 1
                 i_count = 1
-                
+                                
                 for obj in self.scr_p.finditer(buf) :
                     t1 = obj.group()
                     # t2 = obj.span()
@@ -130,16 +133,6 @@ class KavMain :
                     else :    
                         file_scan_list.append(['arc_html', 'HTML/IFrame #%d' % i_count])
                         i_count += 1
-                
-                '''
-                count = 1
-                for obj in self.scr_p.finditer(buf) :
-                    # t1 = obj.group()
-                    # t2 = obj.span()
-                    
-                    file_scan_list.append(['arc_html', 'HTML #%d' % count])
-                    count += 1
-                '''
         except :
             pass
 
@@ -181,20 +174,6 @@ class KavMain :
                     if k == arc_in_name :
                         data = buf[t2[0]:t2[1]]
                         return data
-                        
-                '''
-                count = 1
-                for obj in self.scr_p.finditer(buf) :
-                    # t1 = obj.group()
-                    t2 = obj.span()
-                    
-                    k = 'HTML #%d' % count
-                    count += 1
-            
-                    if k == arc_in_name :
-                        data = buf[t2[0]:t2[1]]
-                        return data
-                '''
         except :
             pass
 

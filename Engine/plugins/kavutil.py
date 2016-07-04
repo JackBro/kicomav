@@ -31,7 +31,122 @@ import string
 import hashlib
 import zlib
 import marshal
+import glob
+import time
+import os
 
+class Pattern :
+    def __init__(self) :
+        self.sig_size = {} # 전체 크기 패턴을 관리한다.
+        self.sig_p1 = {}
+        self.sig_p2 = {}
+        self.sig_vname = {}
+        self.sig_time = {}
+        self.path = '' # plugins 경로를 의미
+        
+    def SetPath(self, path) :
+        self.path = path
+        print self.path
+        
+    def ScanMD5(self, sig_name, size, fmd5) :
+        vname = None
+                
+        if self.sig_size.has_key(sig_name) == False : # 패턴이 로딩되어 있나?
+            g_name = '%s%s%s.s*' % (self.path, os.sep, sig_name)
+            fl = glob.glob(g_name)
+            self.LoadSizeSig(sig_name, fl)
+            #print self.sig_size
+            
+        if self.sig_size.has_key(sig_name) : # sig_name의 크기 패턴 가져오기
+            for sigs in self.sig_size[sig_name] :
+                #print sigs
+                if sigs.has_key(size) : # 크기 패턴이 있나?
+                    id = sigs[size] # 크기 패턴이 있다면 id에서 앞쪽 패턴 비교하기
+                    
+                    # 현재 시간을 sig_time에 기록한다.
+                    self.sig_time[sig_name] = time.time()
+                    
+                    # 로딩된 패턴 1이 있나?
+                    if self.sig_p1.has_key(sig_name) == False :
+                        fname = '%s%s%s.i%02d' % (self.path, os.sep, sig_name, id)
+                        #print '[*] fname :', fname
+                   
+                        # 패턴 1 로딩
+                        self.sig_p1[sig_name] = self.LoadPatternSig(fname, id)    
+                        #print '[*] self.sig_p1 :\n', self.sig_p1
+                        
+                    sig_pp1 = self.sig_p1[sig_name][id]
+                    #print '[*] sig_pp1 :\n', sig_pp1
+                    
+                    bmd5 = fmd5.decode('hex')
+                    p1 = bmd5[:6]
+                    p2 = bmd5[6:]
+                    
+                    if p1 in sig_pp1 : # 일치하는 패턴 1이 있나?
+                        idx = sig_pp1.index(p1)
+                        #print '[*] p1 idx :', idx
+                        
+                        # 로딩된 패턴 2이 있나?
+                        if self.sig_p2.has_key(sig_name) == False :
+                            fname = '%s%s%s.c%02d' % (self.path, os.sep, sig_name, id)
+                            #print '[*] fname :', fname
+                       
+                            # 패턴 2 로딩
+                            self.sig_p2[sig_name] = self.LoadPatternSig(fname, id)
+                            #print '[*] self.sig_p2 :\n', self.sig_p2
+                        
+                        sig_pp2 = self.sig_p2[sig_name][id]
+                        #print '[*] sig_pp2 :\n', sig_pp2
+                        
+                        # 뒤쪽 패턴이 일치하나?
+                        if sig_pp2[idx][0] == p2 :
+                            name_id = sig_pp2[idx][1] # 바이러스 이름
+                            
+                            # 로딩된 바이러스 이름이 있나?
+                            if self.sig_vname.has_key(sig_name) == False :
+                                fname = '%s%s%s.n%02d' % (self.path, os.sep, sig_name, id)
+                                #print '[*] fname :', fname
+                           
+                                # 바이러스 이름 로딩
+                                self.sig_vname[sig_name] = self.LoadPatternSig(fname, id)
+                                #print '[*] self.sig_vname :\n', self.sig_vname
+                            
+                            sig_pname = self.sig_vname[sig_name][id]
+                            #print '[*] sig_pname :\n', sig_pname
+                            
+                            vname = sig_pname[name_id]
+                            #print '[*] vname :', vname
+                    
+        self.MemSaveSig() # 메모리 용량을 낮추기 위해 사용
+        return vname
+         
+    def LoadSizeSig(self, sig_name, fl) :
+        t = []
+        for f in fl :
+            data = open(f, 'rb').read()
+            sp = marshal.loads(data)
+            t.append(sp)
+        self.sig_size[sig_name] = t
+
+    def LoadPatternSig(self, fname, id) :
+        t = {}
+        data = open(fname, 'rb').read()
+        sp = marshal.loads(data)
+        t[id] = sp
+        return t
+        
+    def MemSaveSig(self) :
+        # 정리해야 할 패턴이 있을까? (3분 이상 사용되지 않은 패턴)
+        n = time.time()
+        for k in self.sig_time.keys() :
+            #print '[-]', n - self.sig_time[k]
+            if n - self.sig_time[k] > 4 : #(3 * 60) :
+                #print '[*] Delete sig :', k
+                self.sig_p1.pop(k)
+                self.sig_p2.pop(k)
+                self.sig_vname.pop(k)
+                self.sig_time.pop(k)
+                
 class VDB :
     def __init__(self) :
         self.SigNum = 0
@@ -310,7 +425,7 @@ class Structure(object):
         
         return 1 # Success
 
-
+pattern = Pattern() # 전체 패턴을 관리함
 
 #---------------------------------------------------------------------
 # KavMain 클래스
@@ -323,6 +438,9 @@ class KavMain :
     # 백신 엔진 모듈의 초기화 작업을 수행한다.
     #-----------------------------------------------------------------
     def init(self, plugins) : # 백신 모듈 초기화
+        global pattern
+        pattern.SetPath(plugins) # 전체 패턴의 경로를 지정한다.
+
         return 0
 
     #-----------------------------------------------------------------
